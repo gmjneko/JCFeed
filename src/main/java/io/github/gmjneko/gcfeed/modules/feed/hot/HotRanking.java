@@ -4,8 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 近一小时热榜。读取失败时返回 {@link HotPage#unavailable()}，调用方改查累计热度；
- * 空列表是合法的空榜，不能当成 Redis 故障。
+ * 近一小时热榜。读取失败时返回 {@link HotPage#unavailable()}；空列表是合法的空榜，不能当成 Redis 故障。
  */
 public interface HotRanking {
 
@@ -15,9 +14,6 @@ public interface HotRanking {
 
     /** 把一次互动热度加进当前 UTC 分钟桶。失败只记录日志，不抛给已经提交的互动事务。 */
     void add(long videoId, int scoreDelta);
-
-    /** Redis 是否还能读取。写入失败不改变这个判断。 */
-    boolean available();
 
     /**
      * 读取锚定窗口中的一页视频 ID，按热度倒序。

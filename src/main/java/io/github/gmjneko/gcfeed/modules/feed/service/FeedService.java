@@ -12,7 +12,7 @@ public interface FeedService {
     /**
      * 查询 Feed。timeline 和 hot 允许匿名，following/recommend 必须有已验证的 viewerId。
      *
-     * <p>推荐游标使用 Redis 快照，热榜使用窗口或累计热度游标，时间和关注流使用时间/ID 游标。
+     * <p>推荐游标使用 Redis 快照，热榜使用 Redis 窗口游标，时间和关注流使用时间/ID 游标。
      * 非正数 limit、非法游标、未知场景返回参数错误，缺失必需身份返回 401，推荐快照失效返回 410。
      *
      * @param requestId 可空的链路标识，推荐查询透传，不作为幂等键或排序依据

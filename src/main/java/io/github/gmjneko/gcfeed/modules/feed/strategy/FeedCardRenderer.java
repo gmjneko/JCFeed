@@ -6,7 +6,6 @@ import io.github.gmjneko.gcfeed.modules.feed.cache.FeedCardCache;
 import io.github.gmjneko.gcfeed.modules.feed.model.FeedCursor;
 import io.github.gmjneko.gcfeed.modules.feed.model.FeedScene;
 import io.github.gmjneko.gcfeed.modules.feed.model.HotCursor;
-import io.github.gmjneko.gcfeed.modules.feed.model.HotScoreCursor;
 import io.github.gmjneko.gcfeed.modules.feed.repository.FeedRepository;
 import io.github.gmjneko.gcfeed.modules.feed.vo.FeedItemVO;
 import io.github.gmjneko.gcfeed.modules.feed.vo.FeedPageVO;
@@ -55,15 +54,6 @@ public class FeedCardRenderer {
      * 把视频列表组装成带时间/ID 游标的一页，供关注流数据库路径使用。
      */
     public FeedPageVO timePage(FeedScene scene, List<Video> videos, int limit, Long viewerId) {
-        return timePage(scene, videos, limit, viewerId, false);
-    }
-
-    /**
-     * hotScore 为真时游标改用累计热度分（热榜数据库降级路径），其余用时间/ID。
-     * 查询侧约定多取一条：调用方传 limit，Repository 返回最多 limit + 1 条，
-     * 多出的一条只用来判断 has_more，不会进入本页。
-     */
-    public FeedPageVO timePage(FeedScene scene, List<Video> videos, int limit, Long viewerId, boolean hotScore) {
         if (videos.isEmpty()) {
             // 空结果是合法页：游标为空串、没有下一页，不与调用方约定 null。
             return new FeedPageVO(scene.getValue(), List.of(), "", false);
@@ -71,10 +61,7 @@ public class FeedCardRenderer {
         boolean hasMore = videos.size() > limit;
         List<Video> page = hasMore ? videos.subList(0, limit) : videos;
         Video last = page.getLast();
-        // 两种游标不能混用：窗口/热度游标换页时要校验数据源，见 HotCursor。
-        String next = hotScore
-                ? HotCursor.encodeScore(json, new HotScoreCursor(valueOrZero(last.getHotScore()), last.getPublishedAt(), last.getId()))
-                : new FeedCursor(last.getPublishedAt(), last.getId()).encode();
+        String next = new FeedCursor(last.getPublishedAt(), last.getId()).encode();
         return new FeedPageVO(scene.getValue(), render(slots(page), viewerId, index(page)), next, hasMore);
     }
 

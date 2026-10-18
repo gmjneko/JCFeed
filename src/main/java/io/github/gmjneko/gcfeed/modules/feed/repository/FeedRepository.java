@@ -1,7 +1,6 @@
 package io.github.gmjneko.gcfeed.modules.feed.repository;
 
 import io.github.gmjneko.gcfeed.modules.feed.model.FeedCursor;
-import io.github.gmjneko.gcfeed.modules.feed.model.HotScoreCursor;
 import io.github.gmjneko.gcfeed.modules.interaction.entity.InteractionAction;
 import io.github.gmjneko.gcfeed.modules.user.entity.User;
 import io.github.gmjneko.gcfeed.modules.video.entity.Video;
@@ -20,9 +19,6 @@ public interface FeedRepository {
 
     /** 按时间游标读取当前用户已关注作者的上线视频，多取一条判断是否有下一页。 */
     List<Video> findFollowing(Long viewerId, FeedCursor cursor, int limit);
-
-    /** 按累计热度倒序读取上线视频，多取一条判断是否有下一页。Redis 热榜不可用时使用。 */
-    List<Video> findHot(HotScoreCursor cursor, int limit);
 
     /** 筛出当前用户已关注的作者 ID；匿名用户或空列表直接返回空集合。 */
     java.util.Set<Long> findFollowedAuthors(Long viewerId, List<Long> authorIds);

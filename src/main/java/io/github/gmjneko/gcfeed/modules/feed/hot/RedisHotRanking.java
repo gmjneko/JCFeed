@@ -59,17 +59,6 @@ public class RedisHotRanking implements HotRanking {
     }
 
     @Override
-    public boolean available() {
-        try {
-            // 假窗口键 0 只是探针：键不存在没关系，要的是一次真实往返来判断 Redis 通不通。
-            buckets(RedisKeyConstant.FEED_HOT_WINDOW.formatted(0)).isExists();
-            return true;
-        } catch (RuntimeException ex) {
-            return false;
-        }
-    }
-
-    @Override
     public HotPage page(LocalDateTime windowEnd, int offset, int limit) {
         if (limit <= 0) {
             return HotPage.ready(List.of());

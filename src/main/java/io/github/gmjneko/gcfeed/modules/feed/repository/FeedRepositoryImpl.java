@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.gmjneko.gcfeed.common.constant.CommonConstant;
 import io.github.gmjneko.gcfeed.modules.feed.model.FeedCursor;
-import io.github.gmjneko.gcfeed.modules.feed.model.HotScoreCursor;
 import io.github.gmjneko.gcfeed.modules.interaction.entity.InteractionAction;
 import io.github.gmjneko.gcfeed.modules.interaction.mapper.InteractionActionMapper;
 import io.github.gmjneko.gcfeed.modules.user.entity.User;
@@ -56,11 +55,6 @@ public class FeedRepositoryImpl implements FeedRepository {
     @Override
     public List<Video> findFollowing(Long viewerId, FeedCursor cursor, int limit) {
         return videoMapper.followingPage(viewerId, cursor, limit + 1);
-    }
-
-    @Override
-    public List<Video> findHot(HotScoreCursor cursor, int limit) {
-        return videoMapper.hotPage(cursor, limit + 1);
     }
 
     @Override

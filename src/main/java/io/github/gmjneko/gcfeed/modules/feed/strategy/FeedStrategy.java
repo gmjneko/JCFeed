@@ -19,8 +19,8 @@ public interface FeedStrategy {
     boolean requiresLogin();
 
     /**
-     * 取一页并组装卡片。cursor 语义由各场景定义：推荐用快照偏移，热榜用窗口或
-     * 累计热度，时间线和关注流用时间/ID；limit 已被调用方收紧到 [1, 100]。
+     * 取一页并组装卡片。cursor 语义由各场景定义：推荐用快照偏移，热榜用窗口位置，
+     * 时间线和关注流用时间/ID；limit 已被调用方收紧到 [1, 100]。
      */
     FeedPageVO list(FeedQuery query);
 }

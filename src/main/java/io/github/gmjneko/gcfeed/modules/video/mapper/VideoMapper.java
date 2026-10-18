@@ -33,35 +33,4 @@ public interface VideoMapper extends BaseMapper<Video> {
                                         @Param("cursor") FeedCursor cursor,
                                         @Param("fetchLimit") int fetchLimit);
 
-    /**
-     * 热榜降级：按累计热度、发布时间、视频 ID 倒序取一页。
-     *
-     * <p>手写理由：排序键是点赞、评论、收藏的加权表达式，不是单表列，Lambda 无法同时表达
-     * 计算列、三键游标和 LEFT JOIN。
-     */
-    @Select("""
-            <script>
-            SELECT id, author_id, title, description, media_url, cover_url, published_at, hot_score
-            FROM (
-                SELECT v.id, v.author_id, v.title, v.description, v.media_url, v.cover_url, v.published_at,
-                       (COALESCE(vs.like_count, 0) * 3 + COALESCE(vs.comment_count, 0) * 5
-                        + COALESCE(vs.favorite_count, 0) * 4) AS hot_score
-                FROM video v
-                LEFT JOIN video_stat vs ON vs.video_id = v.id
-                WHERE v.status = 2 AND v.published_at IS NOT NULL
-            ) ranked
-            <where>
-            <if test="cursor != null">
-                hot_score &lt; #{cursor.hotScore}
-                OR (hot_score = #{cursor.hotScore} AND published_at &lt; #{cursor.publishedAt})
-                OR (hot_score = #{cursor.hotScore} AND published_at = #{cursor.publishedAt} AND id &lt; #{cursor.videoId})
-            </if>
-            </where>
-            ORDER BY hot_score DESC, published_at DESC, id DESC
-            LIMIT #{fetchLimit}
-            </script>
-            """)
-    java.util.List<Video> hotPage(@Param("cursor") io.github.gmjneko.gcfeed.modules.feed.model.HotScoreCursor cursor,
-                                  @Param("fetchLimit") int fetchLimit);
-
 }

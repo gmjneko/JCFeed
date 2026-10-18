@@ -48,11 +48,6 @@ public class MemoryHotRanking implements HotRanking {
     }
 
     @Override
-    public boolean available() {
-        return open;
-    }
-
-    @Override
     public HotPage page(LocalDateTime windowEnd, int offset, int limit) {
         if (!open) {
             return HotPage.unavailable(null);

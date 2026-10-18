@@ -56,7 +56,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 热榜窗口、数据库降级，以及时间线页缓存和计数缓存。Redis 由内存实现替代。 */
+/** 热榜窗口、Redis 故障响应，以及时间线页缓存和计数缓存。Redis 由内存实现替代。 */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(HotFeedCacheTest.CacheConfiguration.class)
@@ -125,68 +125,29 @@ class HotFeedCacheTest {
         JsonNode first = page(get("/api/feed-items").param("scene", "hot").param("limit", "1"));
         assertThat(ids(first)).containsExactly(3L);
         assertThat(first.get("has_more").asBoolean()).isTrue();
-        LocalDateTime window = HotCursor.decode(first.get("next_cursor").asText(), json).windowEnd();
+        LocalDateTime window = windowEnd(first.get("next_cursor").asText());
         assertThat(window).isEqualTo(HotWindows.minute(START));
 
         clock.set(START.plusSeconds(61 * 60));
         ranking.add(1, 100);
         JsonNode second = hot(first.get("next_cursor").asText());
         assertThat(ids(second)).containsExactly(1L);
-        assertThat(HotCursor.decode(second.get("next_cursor").asText(), json).windowEnd()).isEqualTo(window);
+        assertThat(windowEnd(second.get("next_cursor").asText())).isEqualTo(window);
         assertThat(ids(hot(""))).containsExactly(1L);
         assertThat(ranking.score(3, HotWindows.minute(START))).isEqualTo(HotRanking.COMMENT_WEIGHT);
     }
 
     @Test
-    void cursorKindsStayOnTheirOwnPath() throws Exception {
-        video(1, 1, PUBLISHED);
-        video(2, 1, PUBLISHED.plusDays(1));
-        stat(1, 1, 0, 0);
-        stat(2, 10, 0, 0);
+    void redisFailureReturnsUnavailableAndWindowCursorRemainsRedisOnly() throws Exception {
         ranking.setAvailable(false);
-        JsonNode fallback = hot("");
-        assertThat(ids(fallback)).containsExactly(2L, 1L);
-        String scoreCursor = page(get("/api/feed-items").param("scene", "hot").param("limit", "1")).get("next_cursor").asText();
-        assertThat(HotCursor.decode(scoreCursor, json).kind()).isEqualTo(HotCursor.Kind.SCORE);
+        mvc.perform(get("/api/feed-items").param("scene", "hot"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value(70014));
 
-        JsonNode next = hot(scoreCursor);
-        assertThat(ids(next)).containsExactly(1L);
-        assertThat(next.get("has_more").asBoolean()).isFalse();
-
-        String windowCursor = HotCursor.encodeWindow(json, HotWindows.minute(START), 0);
+        String windowCursor = new HotCursor(HotWindows.minute(START), 0).encode(json);
         mvc.perform(get("/api/feed-items").param("scene", "hot").param("cursor", windowCursor))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(70002));
-
-        ranking.setAvailable(true);
-        ranking.add(1, HotRanking.LIKE_WEIGHT);
-        mvc.perform(get("/api/feed-items").param("scene", "hot").param("cursor", scoreCursor))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(70002));
-        assertThat(ids(hot(""))).containsExactly(1L);
-    }
-
-    @Test
-    void databaseFallbackUsesCumulativeScoreAndStableTies() throws Exception {
-        video(1, 1, PUBLISHED);
-        video(2, 1, PUBLISHED);
-        video(3, 2, PUBLISHED.plusDays(1));
-        stat(1, 0, 1, 0);
-        stat(2, 0, 1, 0);
-        stat(3, 0, 0, 1);
-        ranking.setAvailable(false);
-
-        List<Long> seen = new ArrayList<>();
-        String cursor = "";
-        for (int pageIndex = 0; pageIndex < 3; pageIndex++) {
-            JsonNode page = page(get("/api/feed-items").param("scene", "hot").param("limit", "1").param("cursor", cursor));
-            assertThat(ids(page)).hasSize(1);
-            seen.add(ids(page).getFirst());
-            cursor = page.get("next_cursor").asText();
-            assertThat(page.get("has_more").asBoolean()).isEqualTo(pageIndex < 2);
-        }
-        assertThat(seen).containsExactly(2L, 1L, 3L);
-        JsonNode end = hot(cursor);
-        assertThat(ids(end)).isEmpty();
-        assertThat(end.get("has_more").asBoolean()).isFalse();
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value(70014));
     }
 
     @Test
@@ -276,6 +237,11 @@ class HotFeedCacheTest {
 
     private JsonNode hot(String cursor) throws Exception {
         return page(get("/api/feed-items").param("scene", "hot").param("cursor", cursor));
+    }
+
+    /** 解码并断言是窗口游标，返回锚定分钟；其他形态会在这里炸掉，测试意图不变。 */
+    private LocalDateTime windowEnd(String cursor) {
+        return HotCursor.decode(cursor, json).windowEnd();
     }
 
     private JsonNode request(MockHttpServletRequestBuilder req) throws Exception {
