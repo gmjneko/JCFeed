@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -19,8 +18,8 @@ import java.util.concurrent.TimeUnit;
  * 业务事务内只写 Outbox。提交后发送；确认失败留给定时任务补发，不让发布接口失败。
  *
  * <p>可靠性由三层拼成：afterCommit 在提交成功后立刻试发一次；每次发送同步等待 RabbitMQ 的
- * publisher confirm 最多 5 秒，只有 ack 且未被退回才把 Outbox 行标成已发送；定时任务 relay
- * 默认每 5 秒重扫待发送行补发。行没有失败次数和放弃状态，确认不了的消息会一直重试。
+ * publisher confirm 最多 5 秒，只有 ack 且未被退回才把 Outbox 行标成已发送；OutboxRelayJob
+ * 定时任务默认每 5 秒重扫待发送行补发。行没有失败次数和放弃状态，确认不了的消息会一直重试。
  *
  * <p>afterCommit 线程与定时任务可能同时取到同一行并发送两次，消费端按事件 ID 幂等去重，
  * 重复投递不产生副作用。
@@ -56,12 +55,10 @@ public class OutboxFeedEventPublisher implements FeedEventPublisher {
         enqueue(event.eventId(), RELATION_CHANGED, json.writeValueAsString(event));
     }
 
-    /** 定时补发：afterCommit 那次发送失败的消息行仍是待发送，这里按固定节奏重扫。 */
-    @Scheduled(fixedDelayString = "${gcfeed.rabbitmq.relay-interval-ms:5000}")
-    public void relay() {
-        publishPending();
-    }
-
+    /**
+     * 发送待发送行：afterCommit 的快路径和 OutboxRelayJob 的定时补发共用这一份逻辑，
+     * 两个入口并发时的重复由消费端幂等和 markSent 的条件更新消化。
+     */
     public void publishPending() {
         for (EventOutbox row : outbox.pending(100)) {
             publish(row);
