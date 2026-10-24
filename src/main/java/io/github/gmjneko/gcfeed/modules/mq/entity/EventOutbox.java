@@ -6,7 +6,12 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
-/** 与业务写入处于同一事务的待发送事件。 */
+/**
+ * 与业务写入处于同一事务的待发送事件。
+ *
+ * <p>status 只有待发送/已发送两态，没有失败次数和放弃状态：确认不了的消息由补发任务一直重试。
+ * 已发送的行保留在表里不清理，待发送行按 id 升序扫描。
+ */
 @TableName("event_outbox")
 public class EventOutbox {
 

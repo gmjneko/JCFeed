@@ -9,7 +9,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** 启动时声明持久化交换机和队列。业务请求里不再临时建拓扑。 */
+/**
+ * 启动时声明持久化交换机和队列。业务请求里不再临时建拓扑。
+ *
+ * <p>两个业务交换机按领域划分：gcfeed.video 承载视频发布事件，gcfeed.relation 承载关注关系变化。
+ * video.published 一条消息同时绑定两个队列（关注流扇出、向量生成），topic 交换机把它复制成两份，
+ * 两条链路互不等待。gcfeed.dlx 是死信交换机：业务队列里被拒绝且不重回队列的消息
+ * 按各自的死信路由键进入 原队列名.dlq，由 FeedMessageListener 落库留档。
+ */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "gcfeed.rabbitmq.enabled", havingValue = "true")
 public class RabbitTopology {
@@ -25,6 +32,7 @@ public class RabbitTopology {
 
     @Bean
     public Declarables feedDeclarables() {
+        // 交换机与队列都声明为持久化：代理重启后拓扑仍在，只需要补消息本身。
         TopicExchange video = new TopicExchange(VIDEO_EXCHANGE, true, false);
         TopicExchange relation = new TopicExchange(RELATION_EXCHANGE, true, false);
         TopicExchange dead = new TopicExchange(DEAD_EXCHANGE, true, false);
@@ -45,6 +53,7 @@ public class RabbitTopology {
                 BindingBuilder.bind(relationDead).to(dead).with(RELATION_CHANGED));
     }
 
+    /** 业务队列统一挂死信交换机：被拒绝且不重回队列的消息按死信路由键进入对应的 原队列名.dlq。 */
     private static Queue durable(String name, String deadKey) {
         return QueueBuilder.durable(name)
                 .deadLetterExchange(DEAD_EXCHANGE)

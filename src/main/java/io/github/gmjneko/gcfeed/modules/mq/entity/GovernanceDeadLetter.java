@@ -6,7 +6,12 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
-/** 超过重试次数后留下的死信，供后续人工或任务查看。 */
+/**
+ * 超过重试次数后留下的死信，供后续人工或任务查看。
+ *
+ * <p>当前只写不读：还没有查询和重放入口。向量丢失另有补偿扫描（EmbeddingBackfillJob）兜底，
+ * 关注流扇出失败暂时没有第二条补偿链路。
+ */
 @TableName("governance_dead_letter")
 public class GovernanceDeadLetter {
 
